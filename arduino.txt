@@ -1,0 +1,98 @@
+#include <SoftwareSerial.h>
+SoftwareSerial mySerial(8,9); //SIM900 Tx & Rx is connected to Arduino #8 & #9.0
+#include "LiquidCrystal.h"
+
+const int voltageSensor = A3;
+float vOUT = 0.0;
+float vIN = 0.0,I=0.0,P=0.0;
+float R1 = 30000.0;
+float R2 = 7500.0;
+float P1 = 0.23;
+int value = 0;
+float loss=0;
+const int rs = 12, en = 11, d4 = 2, d5 = 3, d6 = 4, d7 = 5;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup()
+{
+  //Serial.begin(9600);
+  lcd.begin(16,2);
+  lcd.print(" Measure > 25V  ");
+  delay(2000);
+  value = analogRead(voltageSensor);
+  vOUT = (value * 5.0) / 1024.0;
+  vIN = vOUT / (R2/(R1+R2));
+  I=vOUT/10;
+  P=(vOUT*vOUT)/10;
+  //Serial.print("Input = ");
+  //Serial.println(vIN);
+  lcd.setCursor(0,0);
+  lcd.print("Voltage = ");
+  lcd.setCursor(9,0);
+  lcd.print(vOUT);
+  delay(500);
+  lcd.setCursor(0,1);  
+  lcd.print("Power= "); 
+  lcd.setCursor(9,1);
+  lcd.print(P);  
+  lcd.setCursor(13,1);
+  lcd.print("mW");
+  Serial.begin(9600);
+ 
+  //Begin serial communication with Arduino and SIM900
+  mySerial.begin(9600);
+  Serial.println("Initializing..."); 
+  delay(1000);
+  mySerial.println("AT"); //Handshaking with SIM900
+  updateSerial();
+  mySerial.println("AT+CMGF=1"); // Configuring TEXT mode
+  updateSerial();
+  mySerial.println("AT+CMGS=\"+919448434516\"");
+  updateSerial(); 
+}
+void loop()
+{
+  value = analogRead(voltageSensor);
+  vOUT = (value * 5.0) / 1024.0;
+  vIN = vOUT / (R2/(R1+R2));
+  I=vOUT/10;
+  P=(vOUT*vOUT)/10;
+  delay(1000);
+  lcd.clear();
+  loss=P1-P;
+  lcd.setCursor(0,0);  
+  lcd.print("loss= "); 
+  lcd.setCursor(9,0);
+  lcd.print(loss);
+  if(loss>0.12)
+  {
+    lcd.setCursor(0,1);
+    lcd.print("ALERT!!!");
+    delay(1000);
+    lcd.clear();
+    lcd.setCursor(0,1);
+    lcd.print("Theft Detected");
+    mySerial.print("Theft Detected!\n");
+    mySerial.print("LOSS= ");
+    mySerial.print(loss);     //text content
+    updateSerial();
+    mySerial.write(26);   
+  }
+  else
+  {
+    lcd.setCursor(0,1);
+    lcd.print("NO THEFT");
+  }
+}
+void updateSerial()
+{
+  delay(500);
+  while (Serial.available()) 
+  {
+    mySerial.write(Serial.read());//Forward what Serial received to Software Serial Port
+  }
+  while(mySerial.available()) 
+  {
+    Serial.write(mySerial.read());//Forward what Software Serial received to Serial Port
+  }
+  }
